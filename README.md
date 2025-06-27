@@ -31,7 +31,7 @@ These simple rules, when applied to each "boid" (bird-oid object), create emerge
 
 1. **Clone and Install**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/Katakuri004/Boid-s-Algorithm
    cd boids-algo
    npm install
    npm run dev
