@@ -58,19 +58,27 @@ const ASPECT_RATIO = 16 / 9;
 const MARGIN = 24;
 
 // --- UTILITY AND COMPONENT START ---
-function getCanvasSize() {
-    const w = window.innerWidth - MARGIN * 2;
-    const h = window.innerHeight - MARGIN * 2 - 280; // More space for expanded UI
-    return (w / h > ASPECT_RATIO) 
-        ? { width: Math.floor(h * ASPECT_RATIO), height: h }
-        : { width: w, height: Math.floor(w / ASPECT_RATIO) };
+// Accepts a sidebar ref and returns a function to get the canvas size
+function getCanvasSize(sidebarHeight: number | null) {
+    const w = window.innerWidth - MARGIN * 2 - 400; // leave space for sidebar
+    let h: number;
+    if (sidebarHeight && sidebarHeight > 0) {
+        h = sidebarHeight;
+    } else {
+        h = window.innerHeight - MARGIN * 2 - 80; // fallback
+    }
+    // Always use the sidebar height as the canvas height, but keep aspect ratio for width
+    return { width: Math.floor(h * ASPECT_RATIO), height: h };
 }
 
 const ThreeBoids: React.FC = () => {
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const sidebarRef = useRef<HTMLDivElement>(null);
+    const [sidebarHeight, setSidebarHeight] = useState<number | null>(null);
     const [speciesList, setSpeciesList] = useState<SpeciesParams[]>(initialSpeciesList);
     const [resetKey, setResetKey] = useState(0);
-    const [canvasSize, setCanvasSize] = useState(getCanvasSize());
+    const [canvasSize, setCanvasSize] = useState(() => getCanvasSize(null));
     // Track which tab is active (species id as string)
     const [activeTab, setActiveTab] = useState(speciesList[0]?.id.toString() ?? "0");
     // Ensure activeTab is always a valid tab when speciesList changes
@@ -81,11 +89,19 @@ const ThreeBoids: React.FC = () => {
             setActiveTab(speciesList[0].id.toString());
         }
     }, [speciesList]);
+
+    // Update sidebar height and canvas size on mount and resize
     useEffect(() => {
-        const handleResize = () => setCanvasSize(getCanvasSize());
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+        function updateSizes() {
+            const sidebarEl = sidebarRef.current;
+            const height = sidebarEl ? sidebarEl.offsetHeight : null;
+            setSidebarHeight(height);
+            setCanvasSize(getCanvasSize(height));
+        }
+        updateSizes();
+        window.addEventListener('resize', updateSizes);
+        return () => window.removeEventListener('resize', updateSizes);
+    }, [speciesList]);
 
     // --- 2. THE CORE SIMULATION LOGIC (useEffect) ---
     useEffect(() => {
@@ -299,7 +315,7 @@ const ThreeBoids: React.FC = () => {
         <main className="min-h-screen w-full bg-gradient-to-b from-neutral-950 to-neutral-900 flex flex-col items-center justify-center py-0 px-0">
             <section className="w-full max-w-[1800px] flex flex-row items-start justify-center gap-0 md:gap-8 py-8 px-2">
                 {/* Sidebar Controls */}
-                <aside className="w-full max-w-xs md:max-w-sm lg:max-w-xs xl:max-w-sm bg-neutral-900/95 border border-neutral-800 rounded-2xl shadow-xl flex flex-col items-stretch p-6 gap-6 sticky top-8 self-start min-h-[600px]">
+                <aside ref={sidebarRef} className="w-full max-w-xs md:max-w-sm lg:max-w-xs xl:max-w-sm bg-neutral-900/95 border border-neutral-800 rounded-2xl shadow-xl flex flex-col items-stretch p-6 gap-6 sticky top-8 self-start min-h-[600px]">
                     <div className="flex justify-between items-center mb-2">
                         <h2 className="text-2xl font-bold text-neutral-100">Species Controls</h2>
                         <Button onClick={addSpecies} className="text-xs px-2 py-1 h-8">Add Species</Button>
@@ -399,7 +415,20 @@ const ThreeBoids: React.FC = () => {
                 {/* Main Canvas Area */}
                 <section className="flex-1 flex flex-col items-center justify-center min-w-0">
                     <div className="w-full flex flex-col items-center justify-center">
-                        <canvas ref={canvasRef} width={canvasSize.width} height={canvasSize.height} className="rounded-2xl shadow-2xl border border-neutral-800 bg-[#32353b] max-w-full max-h-[80vh] aspect-video" style={{background: '#32353b'}}/>
+                        <canvas
+                            ref={canvasRef}
+                            width={canvasSize.width}
+                            height={canvasSize.height}
+                            className="rounded-2xl shadow-2xl border border-neutral-800 bg-[#32353b] max-w-full"
+                            style={{
+                                background: '#32353b',
+                                minHeight: sidebarHeight ? `${sidebarHeight}px` : undefined,
+                                height: sidebarHeight ? `${sidebarHeight}px` : undefined,
+                                maxHeight: '90vh',
+                                width: `${canvasSize.width}px`,
+                                maxWidth: '100%'
+                            }}
+                        />
                     </div>
                     <div className="w-full flex items-center justify-center gap-4 mt-6">
                         <Button variant="outline" className="text-red-500 border-red-500 px-4 py-2" onClick={() => setResetKey(k => k + 1)}>Reset Simulation</Button>
