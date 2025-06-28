@@ -211,29 +211,27 @@ const ThreeBoids: React.FC = () => {
             ctx.restore();
         }
 
-        // Helper functions from previous steps
-        // Improved edge-handling: nudge boids back in with a margin and turn factor, inspired by classic reference
+        // Soft edge: apply a smooth steering force as boids approach the edge, no hard position reset
         function keepWithinBounds(boid: Boid, w: number, h: number) {
-            const margin = 40; // Responsive margin for edge avoidance
-            const turnFactor = 1.5; // How sharply to turn back
-
+            const margin = 80; // Distance from edge to start turning
+            const maxTurn = 0.8; // Maximum steering force
             // X axis
             if (boid.position.x < margin) {
-                boid.velocity.x += turnFactor;
-                boid.position.x = Math.max(boid.position.x, margin * 0.5);
+                const strength = (margin - boid.position.x) / margin; // 0 (at margin) to 1 (at edge)
+                boid.velocity.x += maxTurn * strength;
             }
             if (boid.position.x > w - margin) {
-                boid.velocity.x -= turnFactor;
-                boid.position.x = Math.min(boid.position.x, w - margin * 0.5);
+                const strength = (boid.position.x - (w - margin)) / margin;
+                boid.velocity.x -= maxTurn * strength;
             }
             // Y axis
             if (boid.position.y < margin) {
-                boid.velocity.y += turnFactor;
-                boid.position.y = Math.max(boid.position.y, margin * 0.5);
+                const strength = (margin - boid.position.y) / margin;
+                boid.velocity.y += maxTurn * strength;
             }
             if (boid.position.y > h - margin) {
-                boid.velocity.y -= turnFactor;
-                boid.position.y = Math.min(boid.position.y, h - margin * 0.5);
+                const strength = (boid.position.y - (h - margin)) / margin;
+                boid.velocity.y -= maxTurn * strength;
             }
         }
         function limitSpeed(boid: Boid, limit: number) { /* ... */ }
