@@ -71,8 +71,8 @@ function getCanvasSize(sidebarHeight: number | null) {
     return { width: Math.floor(h * ASPECT_RATIO), height: h };
 }
 
-const ThreeBoids: React.FC = () => {
 
+const ThreeBoids: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sidebarRef = useRef<HTMLDivElement>(null);
     const [sidebarHeight, setSidebarHeight] = useState<number | null>(null);
@@ -81,6 +81,11 @@ const ThreeBoids: React.FC = () => {
     const [canvasSize, setCanvasSize] = useState(() => getCanvasSize(null));
     // Track which tab is active (species id as string)
     const [activeTab, setActiveTab] = useState(speciesList[0]?.id.toString() ?? "0");
+    // Trace path state: { [speciesId: number]: boolean }
+    const [tracePath, setTracePath] = useState<{ [id: number]: boolean }>({});
+    // Store trails for each boid (by boid id)
+    const trailsRef = useRef<{ [boidId: number]: { x: number, y: number }[] }>({});
+
     // Ensure activeTab is always a valid tab when speciesList changes
     React.useEffect(() => {
         if (speciesList.length === 0) return;
@@ -104,6 +109,7 @@ const ThreeBoids: React.FC = () => {
     }, [speciesList]);
 
     // --- 2. THE CORE SIMULATION LOGIC (useEffect) ---
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -129,6 +135,9 @@ const ThreeBoids: React.FC = () => {
 
         const preyBoids = boids.filter(b => !speciesList[b.speciesId].isPredator);
         const predatorBoids = boids.filter(b => speciesList[b.speciesId].isPredator);
+
+        // Reset trails if simulation is reset
+        trailsRef.current = {};
 
         function animate() {
             if (!ctx) return;
@@ -188,7 +197,39 @@ const ThreeBoids: React.FC = () => {
                 boid.position.x += boid.velocity.x;
                 boid.position.y += boid.velocity.y;
                 keepWithinBounds(boid, width, height);
+
+                // --- Trace Path Logic ---
+                if (tracePath[boid.speciesId]) {
+                    if (!trailsRef.current[boid.id]) {
+                        trailsRef.current[boid.id] = [];
+                    }
+                    trailsRef.current[boid.id].push({ x: boid.position.x, y: boid.position.y });
+                    // Limit trail length for performance
+                    if (trailsRef.current[boid.id].length > 120) {
+                        trailsRef.current[boid.id].shift();
+                    }
+                }
+
                 drawBoid(boid);
+            });
+
+            // Draw trails after boids so they're under the boids
+            Object.entries(trailsRef.current).forEach(([boidId, trail]) => {
+                if (!Array.isArray(trail) || trail.length < 2) return;
+                // Get speciesId for color
+                const boid = boids[parseInt(boidId)];
+                if (!boid || !tracePath[boid.speciesId]) return;
+                ctx.save();
+                ctx.strokeStyle = speciesList[boid.speciesId]?.color || '#fff';
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(trail[0].x, trail[0].y);
+                for (let i = 1; i < trail.length; i++) {
+                    ctx.lineTo(trail[i].x, trail[i].y);
+                }
+                ctx.stroke();
+                ctx.restore();
             });
 
             animationId = requestAnimationFrame(animate);
@@ -380,6 +421,14 @@ const ThreeBoids: React.FC = () => {
                                             onCheckedChange={c => updateSpeciesProperty(species.id, 'isPredator', c)}
                                         />
                                         <Label className="text-red-400 font-medium">Is Predator?</Label>
+                                    </div>
+                                    {/* Trace Path Switch */}
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            checked={!!tracePath[species.id]}
+                                            onCheckedChange={checked => setTracePath(tp => ({ ...tp, [species.id]: checked }))}
+                                        />
+                                        <Label className="text-blue-400 font-medium">Trace Path</Label>
                                     </div>
                                     {!species.isPredator && (
                                         <div>
